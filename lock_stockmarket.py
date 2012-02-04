@@ -25,6 +25,7 @@ def build_update_obj(p, q = None):
             update["content." + m + "." + s]  = -q["content"][m][s]
     return update
     
+# Build a query object that checks that a portofolio at least the stocks to trade  
 def build_check_obj(p):
     check = {} 
     for m in p["content"]:
@@ -49,10 +50,13 @@ def stock_trade(mongodb):
         t = time.time()
         elasped = t - 30  
         # To lock an object, we set a _locked attributed and a _lock_time
-        # The lock is only valid for 30 seconds. 
+        # The lock is considered to be  valid for only 30 seconds. 
+        # A expiring lock is necessary to protect from crash of this thread in mid-air. 
         lock_check_expr =  { '$or' : [{ "_locked" : { "$ne" : 1 } } , { "$le" : { "_lock_time" : elasped } }  ]  }
         ret = mongodb.portofolio.update({ "$and" : [ {"user":add_1["user"]}, lock_check_expr] }, { "$set" : { "_locked" : 1, "_lock_time" : t  } }  , safe=True)
         if not ret['updatedExisting']: 
+            # Unable to lock the object : retry
+            # (A better implementation would check that the object actually exists in the database, and have some retry limit)
             time.sleep(0.5)
             continue 
         ret = mongodb.portofolio.update({ "$and": [ {"user":add_2["user"]}, lock_check_expr] } , { "$set" : { "_locked" : 1, "_lock_time" : t } } , safe=True)
@@ -63,7 +67,8 @@ def stock_trade(mongodb):
             continue
         break 
         
-    ## Perform the update 
+    ## We perform atomically a check on availability and update on each objects, under the common lock
+      
     ret = mongodb.portofolio.update(check_1, { "$inc" : update_1 }, safe=True )
     if not ret['updatedExisting']:
         raise Exception()

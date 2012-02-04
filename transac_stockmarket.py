@@ -84,7 +84,6 @@ def stock_trade(mongodb):
     if not ret['updatedExisting']:
          raise Exception()        
     
-    
 @app.route("/stockexchange/distribute", method="POST")
 def stock_distribute(mongodb):
     portofolio_order = request.json

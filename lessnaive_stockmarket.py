@@ -11,6 +11,8 @@ def get_portofolio(user, mongodb):
     portofolio = mongodb.portofolio.find_one({ "user" : user})    
     return portofolio
 
+# In order to use mongodb atomic document update, 
+# a dictionary containing all the updated to perform to a given object is created
 def build_update_obj(p, q = None):
     update = {}
     for m in p["content"]: 
@@ -23,6 +25,7 @@ def build_update_obj(p, q = None):
             update["content." + m + "." + s]  = -q["content"][m][s]
     return update
     
+
 @app.route("/stockexchange/trade", method="POST")
 def stock_trade(mongodb):
     trade_order = request.json

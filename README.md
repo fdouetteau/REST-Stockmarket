@@ -36,9 +36,12 @@ A Stockmarket
 Several implementation are featured: 
 ------------------
 
-* naive_stockmarket.py :  A Naive implementation, with no check or transactional guaranteess
+* naive_stockmarket.py :  A Naive implementation, with no validation or transactional guarantees
 
 * lessnative_stockmarket.py  : Features MongoDB atomic operations. No validation of transfers .. 
 
+* lock_stockmarket.py : Performs validation of transfers. Ensure consistency by locking. 
 
+* transac_stockmarket.py : Performs validation and use two-phase commits to ensure proper transactional behaviour 
+  
  
