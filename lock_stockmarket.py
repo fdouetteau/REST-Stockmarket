@@ -29,7 +29,7 @@ def build_check_obj(p):
     check = {} 
     for m in p["content"]:
         for s in p["content"][m]:
-            check["content." + m + "." + s] = { "$gt" : p["content"][m][s]}
+            check["content." + m + "." + s] = { "$gte" : p["content"][m][s]}
     return check
     
 @app.route("/stockexchange/trade", method="POST")
