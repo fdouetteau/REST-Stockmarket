@@ -1,4 +1,4 @@
 bottle==0.10.7
-bottle-mongodb==0.1.1
+bottle-mongodb==0.2
 pymongo==2.1.1
 wsgiref==0.1.2
