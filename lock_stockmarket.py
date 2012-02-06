@@ -87,4 +87,4 @@ def stock_distribute(mongodb):
 if __name__ == "__main__": 
     utils.init(plugin.get_mongo())
     debug(True)
-    run(app=app, host="0.0.0.0", port=os.environ.get("PORT", 8080), reloader=True)
+    run(app=app, host="0.0.0.0", port=os.environ.get("PORT", 8080), reloader=True, server="tornado")

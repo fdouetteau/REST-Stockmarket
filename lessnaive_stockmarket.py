@@ -26,9 +26,11 @@ def stock_trade(mongodb):
 def stock_distribute(mongodb):
     portofolio_order = request.json
     update_obj = utils.build_update_obj(portofolio_order)
-    mongodb.portofolio.update({ "user" : portofolio_order['user']}, { "$inc" : update_obj })
+    ret = mongodb.portofolio.update({ "user" : portofolio_order['user']}, { "$inc" : update_obj }, safe=True)
+    if not ret['updatedExisting']:
+        mongodb.portofolio.insert(portofolio_order)
     
 if __name__ == "__main__": 
     utils.init(plugin.get_mongo())
     debug(True)
-    run(app=app, host="0.0.0.0", port=os.environ.get("PORT", 8080), reloader=True)
+    run(app=app, host="0.0.0.0", port=os.environ.get("PORT", 8080), reloader=True, server="tornado")

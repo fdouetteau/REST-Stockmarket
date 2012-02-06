@@ -44,4 +44,3 @@ Several implementation are featured:
 
 * transac_stockmarket.py : Performs validation and use two-phase commits to ensure proper transactional behaviour 
   
- 
