@@ -5,6 +5,7 @@ import random
 import time
 from multiprocessing import Pool
 import logging
+import optparse
 
 
 markets = None
@@ -20,6 +21,13 @@ N_SESSIONS = 1000
 N_DISTRIBUTE = 3 # 10 # Number of distributions factors
 N_DISTRIBUTE_SIZE = 10 # 10 # Number of items in distribution
 N_GIVE = 3 # 5 # Number of gives.
+
+have_timer = True
+
+def get_time(): 
+    if have_timer: 
+        return time.time()
+    return 0 
 
 class TimeCounter(object):
     """A Simple Counter for number of calls / time spent """
@@ -50,9 +58,9 @@ class TimeCounters(dict):
 
 class Runner(object):
     def get_portofolio(self, user):
-        t1 = time.time()
+        t1 = get_time()
         r = self.http.request('GET', '/portofolio/' + user)
-        t2 = time.time()
+        t2 = get_time()
         self.counter['get'].do_count(t1, t2)
         if r.status != 200: 
             raise Exception()
@@ -60,24 +68,26 @@ class Runner(object):
 
     def distribute(self, user, content):
         obj = { 'user' : user, 'content': content}
-        t1 = time.time()
+        t1 = get_time()
         r = self.http.urlopen('POST', '/stockexchange/distribute', body=json.dumps(obj), headers={'Content-Type':'application/json'})
-        t2 = time.time()
+        t2 = get_time()
         self.counter['distribute'].do_count(t1, t2)
         if r.status != 200: 
             raise Exception()
 
     def trade(self, u1, c1, u2, c2):
         obj = { 'portofolio_1' : { 'user': u1,'content': c1}, 'portofolio_2' : { 'user' : u2, 'content' : c2 } }
-        t1 = time.time()
+        t1 = get_time()
         r = self.http.urlopen('POST', '/stockexchange/trade', body=json.dumps(obj), headers={'Content-Type':'application/json'})
-        t2 = time.time()
+        t2 = get_time()
         self.counter['trade'].do_count(t1, t2)
         if r.status != 200:
             raise Exception()
     
-    def __init__(self, users):
+    def __init__(self, users, timer):
         super(Runner, self).__init__()
+        global have_timer
+        have_timer = timer  
         self.counter = TimeCounters()
         self.counter['get'] = TimeCounter("Get Portofolio")
         self.counter['distribute'] = TimeCounter("Distribute")
@@ -122,14 +132,27 @@ def play_sessions(runner):
     return runner.counter
 
 if __name__ == "__main__":
-    logging.basicConfig()
-    logging.getLogger("urllib3.connectionpool").setLevel("INFO")
+    parser = optparse.OptionParser()
+    parser.add_option('--no_timing', action="store_true", default=False)
+    parser.add_option('--connection_log', action="store_true", default=False)
+    options, remainder = parser.parse_args()
+    
+    if options.connection_log: 
+        logging.basicConfig()
+        logging.getLogger("urllib3.connectionpool").setLevel("INFO")
+        
+    if options.no_timing: 
+        print "Disabling timer"
+        have_timer = False
+    else: 
+        have_timer = True 
+        
     
     markets = ["market_%u" % i for i in xrange(0,N_MARKETS) ]
     stocks =  ["stock_%u" % i for i in xrange(0,N_STOCKS) ]
     users = ["user_%u" % i for i in xrange(0,N_USERS) ]
     
-    runners = [Runner(users[i*(N_USERS/N_RUNNERS):(i+1)*(N_USERS/N_RUNNERS)]) for i in xrange(0, N_RUNNERS)] 
+    runners = [Runner(users[i*(N_USERS/N_RUNNERS):(i+1)*(N_USERS/N_RUNNERS)], have_timer) for i in xrange(0, N_RUNNERS)] 
     for r in runners: 
         r.nsessions = N_SESSIONS / N_RUNNERS
         
@@ -137,14 +160,14 @@ if __name__ == "__main__":
 
     pool = Pool(4)
 
-    init_start = time.time()   
+    init_start = get_time()   
     pool.map(init_user, runners)
-    init_stop = time.time()
+    init_stop = get_time()
     print "Completed user initialization in %0.3f s " % (init_stop - init_start)
 
-    session_start = time.time()
+    session_start = get_time()
     results = pool.map(play_sessions, runners)
-    session_stop = time.time()
+    session_stop = get_time()
     print 'Played %u sessions in %0.3f s' % (N_SESSIONS, (session_stop - session_start))
     
     
