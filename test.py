@@ -1,11 +1,10 @@
 
 import urllib3 
 import json
-from threading import Thread
 import random
 import time
+from multiprocessing import Pool
 
-http = urllib3.HTTPConnectionPool('localhost:8080', maxsize=10)
 
 markets = None
 stocks = None
@@ -14,62 +13,74 @@ users = None
 N_MARKETS = 50 # 50   # Number of markets. 
 N_STOCKS = 10 # 10   # Number of stocks
 N_USERS = 100000 # 100000 # Number of distinct users
-N_THREADS = 10 # 20 # Number of concurrent threads. 
-N_SESSIONS_PER_THREAD = 100 # 100 # Number of sessions played by a thread 
+N_RUNNERS = 10 # Number of Sessions runners objects created
+N_POOL = 4 # Max in Parallel   
+N_SESSIONS = 5000
 N_DISTRIBUTE = 3 # 10 # Number of distributions factors
 N_DISTRIBUTE_SIZE = 10 # 10 # Number of items in distribution
 N_GIVE = 3 # 5 # Number of gives.
 
-class Runner(Thread):
+class TimeCounter(object):
+    """A Simple Counter for number of calls / time spent """
+    def __init__(self, name):
+        self.name = name
+        self.count = 0 
+        self.time = 0 
+    
+    def do_count(self, time_begin, time_end):
+        self.count = self.count + 1
+        self.time = self.time + (time_end - time_begin)
 
-    count_get = 0 
-    time_get = 0 
+    def get_info(self):
+        return '%s: %u times, %0.3f s overall, %0.3f ms mean time' % (self.name, self.count, self.time*1000000, (self.time/self.count)*1000)
+        
+    def __add__(self, other):
+        s = TimeCounter(self.name)
+        s.count = self.count + other.count
+        s.time = self.time + other.time
+        return s
+        
+class TimeCounters(dict):
+    def __add__(self, other):
+        s = TimeCounters()
+        for k in self: 
+            s[k] = self[k] + other[k]
+        return s
 
+class Runner(object):
     def get_portofolio(self, user):
-        t1 = time.clock()
-        r = http.request('GET', '/portofolio/' + user)
-        t2 = time.clock()
-        self.count_get = self.count_get + 1
-        self.time_get = self.time_get + (t2-t1)
+        t1 = time.time()
+        r = self.http.request('GET', '/portofolio/' + user)
+        t2 = time.time()
+        self.counter['get'].do_count(t1, t2)
         if r.status != 200: 
             raise Exception()
         return json.loads(r.data) 
 
-    count_distribute = 0 
-    time_distribute = 0 
-
     def distribute(self, user, content):
         obj = { 'user' : user, 'content': content}
-        t1 = time.clock()
-        r = http.urlopen('POST', '/stockexchange/distribute', body=json.dumps(obj), headers={'Content-Type':'application/json'})
-        t2 = time.clock()
-        self.count_distribute = self.count_distribute + 1 
-        self.time_distribute = self.time_distribute + (t2 - t1)
+        t1 = time.time()
+        r = self.http.urlopen('POST', '/stockexchange/distribute', body=json.dumps(obj), headers={'Content-Type':'application/json'})
+        t2 = time.time()
+        self.counter['distribute'].do_count(t1, t2)
         if r.status != 200: 
             raise Exception()
 
-    count_trade = 0 
-    time_trade  = 0 
-
     def trade(self, u1, c1, u2, c2):
         obj = { 'portofolio_1' : { 'user': u1,'content': c1}, 'portofolio_2' : { 'user' : u2, 'content' : c2 } }
-        t1 = time.clock()
-        r = http.urlopen('POST', '/stockexchange/trade', body=json.dumps(obj), headers={'Content-Type':'application/json'})
-        t2 = time.clock()
-        self.count_trade = self.count_trade + 1 
-        self.time_trade = self.time_trade + (t2 - t1)
+        t1 = time.time()
+        r = self.http.urlopen('POST', '/stockexchange/trade', body=json.dumps(obj), headers={'Content-Type':'application/json'})
+        t2 = time.time()
+        self.counter['trade'].do_count(t1, t2)
         if r.status != 200:
             raise Exception()
     
-    def run(self):
-        for i in xrange(0, N_SESSIONS_PER_THREAD):
-            # Select a user
-            self.user = random.choice(self.users)
-            # Play a session
-            self.playSession()
-    
     def __init__(self, users):
         super(Runner, self).__init__()
+        self.counter = TimeCounters()
+        self.counter['get'] = TimeCounter("Get Portofolio")
+        self.counter['distribute'] = TimeCounter("Distribute")
+        self.counter['trade'] = TimeCounter("Trade")
         self.users = users
         
     def playSession(self):
@@ -79,12 +90,6 @@ class Runner(Thread):
             si = random.randint(0, len(stocks)-1)
             for k in xrange(0, N_DISTRIBUTE_SIZE):
                 u[markets[(k+mi)%len(markets)]] = { stocks[(k+si)%len(stocks)] : 1 } 
-#            for k in xrange(0, N_DISTRIBUTE_SIZE):
-#                m = random.choice(markets) 
-#                s = random.choice(stocks)
-#                if not m in u: 
-#                    u[m] = {}
-#                u[m][s] = 1 
             self.distribute(self.user, u)
             
         portofolio = self.get_portofolio(self.user)
@@ -101,38 +106,47 @@ class Runner(Thread):
             portofolio = self.get_portofolio(self.user)
         
 
+def init_user(runner):
+    runner.http = urllib3.HTTPConnectionPool('localhost:8080', maxsize=2)
+    for u in runner.users:
+        runner.distribute(u, {})
+        
+def play_sessions(runner):
+    runner.http = urllib3.HTTPConnectionPool('localhost:8080', maxsize=2)
+    for i in xrange(0, runner.nsessions):
+            # Select a user
+          runner.user = random.choice(runner.users)
+          # Play a session
+          runner.playSession()
+    return runner.counter
+
 if __name__ == "__main__": 
     markets = ["market_%u" % i for i in xrange(0,N_MARKETS) ]
     stocks =  ["stock_%u" % i for i in xrange(0,N_STOCKS) ]
     users = ["user_%u" % i for i in xrange(0,N_USERS) ]
     
-    threads = [Runner(users[i*(N_USERS/N_THREADS):(i+1)*(N_USERS/N_THREADS)]) for i in xrange(0, N_THREADS)] 
-    
-    init_start = time.clock()
-    init_runner = Runner(users)
-    for u in users: 
-        init_runner.distribute(u, {})
-    init_stop = time.clock()
-    print "Completed user initialization in %0.3f s " % (init_stop - init_start)
-     
-    start_time = time.clock()
-    for r in threads: 
-        r.start()
+    runners = [Runner(users[i*(N_USERS/N_RUNNERS):(i+1)*(N_USERS/N_RUNNERS)]) for i in xrange(0, N_RUNNERS)] 
+    for r in runners: 
+        r.nsessions = N_SESSIONS / N_RUNNERS
         
-    sum_runner = Runner(users)
-    for r in threads: 
-        r.join()
-        sum_runner.count_get += r.count_get
-        sum_runner.time_get += r.time_get
-        sum_runner.count_distribute += r.count_distribute 
-        sum_runner.time_distribute += r.time_distribute 
-        sum_runner.count_trade += r.count_trade
-        sum_runner.time_trade += r.time_trade
-    end_time = time.clock()
+    runners[-1].nsessions = N_SESSIONS - ((N_SESSIONS / N_RUNNERS) * (N_RUNNERS - 1))
+
+    pool = Pool(4)
+
+    init_start = time.time()   
+    pool.map(init_user, runners)
+    init_stop = time.time()
+    print "Completed user initialization in %0.3f s " % (init_stop - init_start)
+
+    session_start = time.time()
+    results = pool.map(play_sessions, runners)
+    session_stop = time.time()
+    print 'Played %u sessions in %0.3f s' % (N_SESSIONS, (session_stop - session_start))
     
-    print 'Played %u sessions in %0.3f s' % (N_THREADS * N_SESSIONS_PER_THREAD, (end_time - start_time))
-    print 'Get Portofolio: %u times, %0.3f s overall, %0.3f ms mean time' % (sum_runner.count_get, sum_runner.time_get*1000000, (sum_runner.time_get/sum_runner.count_get)*1000)
-    print 'Distribute: %u times, %0.3f s overall, %0.3f ms mean time' % (sum_runner.count_distribute, sum_runner.time_distribute*1000000, (sum_runner.time_distribute /sum_runner.count_distribute )*1000)
-    print 'Trade: %u times, %0.3f s overall, %0.3f ms mean time' % (sum_runner.count_trade, sum_runner.time_trade*1000000, (sum_runner.time_trade/sum_runner.count_trade)*1000)
+    
+    s = reduce(lambda r1, r2 : r1+r2, results)
+
+    for k in s: 
+        print s[k].get_info()
     
     
