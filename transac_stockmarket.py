@@ -1,4 +1,4 @@
-from bottle import run, debug, request, Bottle
+from bottle import run, debug, request, Bottle, response
 import os
 import bottle_mongo
 import utils
@@ -7,15 +7,21 @@ app = Bottle(autojson=False)
 plugin = bottle_mongo.MongoPlugin(uri="mongodb://localhost/naive_stock", db="naive_stock", json_mongo=True)
 app.install(plugin)
 
+def prepare_response():
+    pass
+    #response.add_header("Connection", "Keep-Alive")
+    
 
 @app.route("/portofolio/:user", method="GET")
 def get_portofolio(user, mongodb):
+    prepare_response()
     portofolio = mongodb.portofolio.find_one({ "user" : user})    
     return utils.portofolio_cleanup(portofolio) 
     
 
 @app.route("/stockexchange/trade", method="POST")
 def stock_trade(mongodb):
+    prepare_response()
     trade_order = request.json
     add_1 = trade_order['portofolio_1']
     add_2 = trade_order['portofolio_2']
@@ -73,6 +79,7 @@ def stock_trade(mongodb):
     
 @app.route("/stockexchange/distribute", method="POST")
 def stock_distribute(mongodb):
+    prepare_response()
     portofolio_order = request.json
     update_obj = utils.build_update_obj(portofolio_order)
     ret = mongodb.portofolio.update({ "user" : portofolio_order['user']}, { "$inc" : update_obj }, safe=True)

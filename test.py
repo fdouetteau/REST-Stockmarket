@@ -4,6 +4,7 @@ import json
 import random
 import time
 from multiprocessing import Pool
+import logging
 
 
 markets = None
@@ -12,10 +13,10 @@ users = None
 
 N_MARKETS = 50 # 50   # Number of markets. 
 N_STOCKS = 10 # 10   # Number of stocks
-N_USERS = 100000 # 100000 # Number of distinct users
+N_USERS = 10000 # 100000 # Number of distinct users
 N_RUNNERS = 10 # Number of Sessions runners objects created
 N_POOL = 4 # Max in Parallel   
-N_SESSIONS = 5000
+N_SESSIONS = 1000
 N_DISTRIBUTE = 3 # 10 # Number of distributions factors
 N_DISTRIBUTE_SIZE = 10 # 10 # Number of items in distribution
 N_GIVE = 3 # 5 # Number of gives.
@@ -120,7 +121,10 @@ def play_sessions(runner):
           runner.playSession()
     return runner.counter
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    logging.basicConfig()
+    logging.getLogger("urllib3.connectionpool").setLevel("INFO")
+    
     markets = ["market_%u" % i for i in xrange(0,N_MARKETS) ]
     stocks =  ["stock_%u" % i for i in xrange(0,N_STOCKS) ]
     users = ["user_%u" % i for i in xrange(0,N_USERS) ]
