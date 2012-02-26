@@ -12,8 +12,7 @@ markets = None
 stocks = None
 users = None
 
-N_MARKETS = 50 # 50   # Number of markets. 
-N_STOCKS = 10 # 10   # Number of stocks
+N_STOCKS = 500 # 10   # Number of stocks
 N_USERS = 10000 # 100000 # Number of distinct users
 N_RUNNERS = 10 # Number of Sessions runners objects created
 N_POOL = 4 # Max in Parallel   
@@ -97,23 +96,21 @@ class Runner(object):
     def playSession(self):
         for i in xrange(0, N_DISTRIBUTE): 
             u = {}
-            mi = random.randint(0, len(markets)-1)
             si = random.randint(0, len(stocks)-1)
             for k in xrange(0, N_DISTRIBUTE_SIZE):
-                u[markets[(k+mi)%len(markets)]] = { stocks[(k+si)%len(stocks)] : 1 } 
+                u[stocks[(k+si)%len(stocks)]] = 1  
             self.distribute(self.user, u)
             
         portofolio = self.get_portofolio(self.user)
         
         for i in xrange(0, N_GIVE):
-            m = random.choice([m for m in portofolio['content']])
-            s = random.choice([s for s in portofolio['content'][m]])
+            s = random.choice([m for m in portofolio['content']])
             other_user = None
             while True:
                 other_user = random.choice(users)
                 if other_user != self.user: 
                     break 
-            self.trade(self.user, { m : { s : 1 } }, other_user, { })
+            self.trade(self.user,  { s : 1 }, other_user, { })
             portofolio = self.get_portofolio(self.user)
         
 
@@ -148,7 +145,6 @@ if __name__ == "__main__":
         have_timer = True 
         
     
-    markets = ["market_%u" % i for i in xrange(0,N_MARKETS) ]
     stocks =  ["stock_%u" % i for i in xrange(0,N_STOCKS) ]
     users = ["user_%u" % i for i in xrange(0,N_USERS) ]
     
