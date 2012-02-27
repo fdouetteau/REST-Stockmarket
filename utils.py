@@ -1,26 +1,26 @@
 
 
-def portofolio_cleanup(portofolio):
-    for m in [m for m in portofolio['content'] if portofolio['content'][m] == 0]:
-        del portofolio['content'][m]
-    return portofolio
+def content_cleanup(content):
+    for m in [m for m in content if content[m] == 0]:
+        del content[m]
+    return content
      
-def build_check_obj(p):
+def build_check_obj(content):
     check = {} 
-    for m in p["content"]:
-        check["content." + m] = { "$gte" : p["content"][m]}
+    for m in content:
+        check["content." + m] = { "$gte" : content[m]}
     return check     
     
 # In order to use mongodb atomic document update, 
 # a dictionary containing all the updated to perform to a given object is created
-def build_update_obj(p, sign=1, neg = None):
+def build_update_obj(content, sign=1, neg = None):
     update = {}
-    for m in p["content"]: 
-        update["content." + m]  = sign * p["content"][m]
+    for m in content: 
+        update["content." + m]  = sign * content[m]
     if not neg:
         return update
-    for m in neg["content"]: 
-        update["content." + m]  = -neg["content"][m]
+    for m in neg: 
+        update["content." + m]  = -neg[m]
     return update
     
 def portofolio_add(p1, p2, sign):
